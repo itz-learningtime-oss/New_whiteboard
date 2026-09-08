@@ -7,15 +7,17 @@ import { prepareStory, renderStorybook } from "@/lib/canvas-storybook";
 type Props = { project: StoryProject; time: number; playing: boolean; muted: boolean; onTogglePlay: () => void; onSeek: (time: number) => void; onMute: () => void; onAddPage: () => void; onError: (message: string) => void };
 export default function StoryPreview({ project, time, playing, muted, onTogglePlay, onSeek, onMute, onAddPage, onError }: Props) {
   const canvas = useRef<HTMLCanvasElement>(null); const stage = useRef<HTMLDivElement>(null);
-  const [ready, setReady] = useState(false); const [expanded, setExpanded] = useState(false);
+  const [ready, setReady] = useState(false); const [slow, setSlow] = useState(false); const [expanded, setExpanded] = useState(false);
   const scenes = getScenes(project);
   const active = Math.max(0, scenes.findIndex(s => time < s.end));
   const index = time >= (scenes.at(-1)?.end || 0) ? Math.max(0, scenes.length - 1) : active;
   const imageKey = project.images.join("|");
   useEffect(() => {
     let cancelled = false;
-    prepareStory(project).then(() => { if (!cancelled) setReady(true); }).catch(error => { if (!cancelled) onError(error.message); });
-    return () => { cancelled = true; };
+    setReady(false); setSlow(false);
+    const slowTimer = setTimeout(() => { if (!cancelled) setSlow(true); }, 12000);
+    prepareStory(project).then(() => { if (!cancelled) { clearTimeout(slowTimer); setReady(true); } }).catch(error => { if (!cancelled) { clearTimeout(slowTimer); setReady(true); onError(error.message); } });
+    return () => { cancelled = true; clearTimeout(slowTimer); };
     // Artwork is cached; changing the story text does not require reloading it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [imageKey, project.settings.font]);
@@ -27,7 +29,7 @@ export default function StoryPreview({ project, time, playing, muted, onTogglePl
     <div className={`book-platform ${project.mode !== "storybook" ? "single-canvas" : ""}`}>
       <div className="storybook-frame">
         <canvas ref={canvas} width={1920} height={1080} aria-label={`Storybook page ${index + 1}: ${scenes[index]?.text || "Add your story"}`} />
-        {!ready && <div className="preview-loading"><Loader2 className="spin" size={24} /><span>Opening your storybook…</span></div>}
+        {!ready && <div className="preview-loading"><Loader2 className="spin" size={24} /><span>Opening your storybook…</span>{slow && <small style={{ opacity: .7 }}>Large illustrations can take a moment on the first open.</small>}</div>}
       </div>
       <div className="preview-caption"><span className="tiny-dot" /> Illustration and words, in perfect company.</div>
     </div>

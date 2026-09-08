@@ -49,17 +49,51 @@ export async function loadArtwork(url: string) {
   if (artworks.has(url)) return;
   if (loading.has(url)) return loading.get(url);
   const promise = new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("This illustration took too long to load.")), 15000);
     const image = new Image();
-    image.onload = () => { try { artworks.set(url, traceImage(image)); resolve(); } catch (error) { reject(error); } };
-    image.onerror = () => reject(new Error("This illustration could not be loaded.")); image.src = url;
+    image.onload = () => { clearTimeout(timer); try { artworks.set(url, traceImage(image)); resolve(); } catch (error) { reject(error); } };
+    image.onerror = () => { clearTimeout(timer); reject(new Error("This illustration could not be loaded.")); };
+    image.src = url;
   });
   loading.set(url, promise);
   try { await promise; } finally { loading.delete(url); }
 }
+
+/** A gentle paper placeholder so one missing file never blocks the whole book. */
+async function ensurePlaceholder(url: string) {
+  if (artworks.has(url)) return;
+  const canvas = document.createElement("canvas"); canvas.width = 280; canvas.height = 320;
+  const ctx = canvas.getContext("2d")!;
+  ctx.fillStyle = "#f1ead9"; ctx.fillRect(0, 0, 280, 320);
+  ctx.strokeStyle = "#c9bfa8"; ctx.lineWidth = 3; ctx.strokeRect(14, 14, 252, 292);
+  ctx.fillStyle = "#a08c5f"; ctx.font = "44px Georgia"; ctx.textAlign = "center";
+  ctx.fillText("✧", 140, 130);
+  ctx.fillStyle = "#8a7f63"; ctx.font = "17px Georgia";
+  ctx.fillText("illustration", 140, 175); ctx.fillText("on its way", 140, 200);
+  const image = new Image();
+  image.src = canvas.toDataURL("image/png");
+  try { await image.decode(); } catch { /* A blank placeholder is still better than a stuck book. */ }
+  artworks.set(url, { image, paths: [], total: 0 });
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("Timed out.")), ms);
+    promise.then(v => { clearTimeout(timer); resolve(v); }, e => { clearTimeout(timer); reject(e); });
+  });
+}
+
 export async function prepareStory(project: StoryProject) {
-  await Promise.all([...new Set(getScenes(project).map(s => s.image))].map(loadArtwork));
-  await document.fonts.load("400 44px Lora"); await document.fonts.load("400 52px Caveat");
-  if (!marker) await new Promise<void>(resolve => { const img = new Image(); img.onload = () => { marker = img; resolve(); }; img.onerror = () => resolve(); img.src = "/images/hand_marker.png"; });
+  const urls = [...new Set(getScenes(project).map(s => s.image))];
+  // One broken illustration must never wedge the preview: fall back to a placeholder.
+  await Promise.all(urls.map(async url => {
+    try { await withTimeout(loadArtwork(url), 15000); }
+    catch { await ensurePlaceholder(url); }
+  }));
+  try {
+    await withTimeout(Promise.all([document.fonts.load("400 44px Lora"), document.fonts.load("400 52px Caveat")]), 8000);
+  } catch { /* System serif/handwriting fallbacks keep the story readable. */ }
+  if (!marker) await new Promise<void>(resolve => { const img = new Image(); const done = () => resolve(); const timer = setTimeout(done, 8000); img.onload = () => { marker = img; clearTimeout(timer); resolve(); }; img.onerror = () => { clearTimeout(timer); resolve(); }; img.src = "/images/hand_marker.png"; });
 }
 function rounded(ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, radius: number, fill?: string, stroke?: string) {
   ctx.beginPath(); ctx.roundRect(x, y, width, height, radius); if (fill) { ctx.fillStyle = fill; ctx.fill(); } if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = 1.8; ctx.stroke(); }

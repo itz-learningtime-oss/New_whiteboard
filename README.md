@@ -13,12 +13,26 @@ A full-stack storybook studio built with Next.js App Router, React, PostgreSQL, 
 - Full HD server-rendered H.264/AAC MP4, audio-backed browser WebM, or a complete portable Python render kit.
 - Original image-to-whiteboard renderer and a browser classic-video mode remain available.
 
-### Run
+### Run on your PC (Windows)
+
+1. Make sure PostgreSQL is running (service `postgresql-x64-17`).
+2. Create the database once (in `psql` or pgAdmin): `CREATE DATABASE whiteboard;`
+3. Copy `.env.example` to `.env` and put your postgres password in `DATABASE_URL`.
+4. Install dependencies with `npm install`.
+5. Apply the schema with `npx drizzle-kit push`.
+6. Restore bundled fonts/images/demo audio with `python scripts/setup_assets.py`.
+7. Start the app with `start.bat` (serves on http://localhost:3010).
+
+For MP4 rendering and voice generation, install Python dependencies
+(`python -m pip install -r requirements.txt`) and FFmpeg/FFprobe.
+Browser WebM exports do not need Python.
+
+### Run (generic)
 
 1. Set `DATABASE_URL` in `.env`.
 2. Install dependencies with `npm install`.
 3. Apply the schema with `npx drizzle-kit push`.
-4. Run `npm run dev`.
+4. Run `npm run dev` (or `npx next dev -p 3010`).
 
 For MP4 rendering, install Python 3.10+, the dependencies below, and FFmpeg/FFprobe. Browser WebM exports do not need Python.
 

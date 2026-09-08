@@ -16,6 +16,18 @@ function Toggle({ checked, onChange, label, description }: { checked: boolean; o
   return <div className="toggle-row"><div><span>{label}</span>{description && <small>{description}</small>}</div><button className={`toggle ${checked ? "on" : ""}`} role="switch" aria-checked={checked} aria-label={label} onClick={onChange}><span /></button></div>;
 }
 
+/** Parse an API response as JSON without ever crashing on HTML error pages. */
+async function parseApi(response: Response) {
+  const contentType = response.headers.get("content-type") || "";
+  if (contentType.includes("application/json")) {
+    const data = await response.json().catch(() => null);
+    if (!response.ok || !data) throw new Error(data?.error && typeof data.error === "string" ? data.error : `Request failed (HTTP ${response.status}). Please try again.`);
+    return data;
+  }
+  if (!response.ok) throw new Error(`Server error (HTTP ${response.status}). The app server may need a restart — check the terminal for errors.`);
+  throw new Error("Unexpected server response. Please reload the page and try again.");
+}
+
 export default function Studio() {
   const [project, setProject] = useState<StoryProject>(freshDemo);
   const projectRef = useRef(project);
@@ -61,13 +73,13 @@ export default function Studio() {
   const closeModal = useCallback(() => setModal(null), []);
   const loadProjects = useCallback(async () => {
     setProjectsLoading(true); setProjectError("");
-    try { const response = await fetch("/api/projects"); const data = await response.json(); if (!response.ok) throw new Error(data.error); setSavedProjects(data); }
+    try { const response = await fetch("/api/projects"); setSavedProjects(await parseApi(response)); }
     catch (error) { setProjectError(error instanceof Error ? error.message : "Unable to load projects."); }
     finally { setProjectsLoading(false); }
   }, []);
   const loadMedia = useCallback(async () => {
     setMediaLoading(true); setMediaError("");
-    try { const response = await fetch("/api/media"); const data = await response.json(); if (!response.ok) throw new Error(data.error); setMediaFiles(data); }
+    try { const response = await fetch("/api/media"); setMediaFiles(await parseApi(response)); }
     catch (error) { setMediaError(error instanceof Error ? error.message : "Unable to load media."); }
     finally { setMediaLoading(false); }
   }, []);
@@ -115,7 +127,7 @@ export default function Studio() {
     if (ttsBusy) return; setTtsBusy(true);
     try {
       const response = await fetch("/api/tts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: project.script.trim(), voice: ttsVoice }) });
-      const data = await response.json(); if (!response.ok) throw new Error(data.error);
+      const data = await parseApi(response);
       setPlaying(false); setTime(0);
       update({ audioUrl: data.audioUrl, audioName: `tts-${ttsVoice}.mp3`, words: data.words, duration: data.duration, timingSource: "word-level" });
       notify(`Voice generated! ${data.wordCount} words perfectly synchronized.`);
@@ -124,8 +136,8 @@ export default function Studio() {
   };
   const runDiagnostics = async () => {
     setDiagResults(null); openModal("diagnostics");
-    try { const r = await fetch("/api/health"); const d = await r.json(); setDiagResults(d.checks); if (d.ok) notify("All systems healthy!"); else notify("Some checks need attention.", true); }
-    catch { setDiagResults({ health: { ok: false, detail: "Health endpoint unreachable" } }); notify("Diagnostics failed.", true); }
+    try { const r = await fetch("/api/health"); const d = await parseApi(r); setDiagResults(d.checks); if (d.ok) notify("All systems healthy!"); else notify("Some checks need attention.", true); }
+    catch (error) { setDiagResults({ health: { ok: false, detail: error instanceof Error ? error.message : "Health endpoint unreachable" } }); notify(error instanceof Error ? error.message : "Diagnostics failed.", true); }
   };
   const save = useCallback(async (quiet = false) => {
     if (saveStatus === "saving") return;
@@ -133,7 +145,7 @@ export default function Studio() {
     try {
       validateProject(snapshot);
       const response = await fetch(snapshot.id ? `/api/projects/${snapshot.id}` : "/api/projects", { method: snapshot.id ? "PUT" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(snapshot) });
-      const data = await response.json(); if (!response.ok) throw new Error(data.error);
+      const data = await parseApi(response);
       const changed = JSON.stringify(projectRef.current) !== JSON.stringify(snapshot);
       setProject(p => ({ ...p, id: data.id })); setSaveStatus(changed ? "dirty" : "saved");
       void loadProjects(); if (!quiet) notify("Your story is saved. A little magic, safely kept.");
@@ -159,22 +171,70 @@ export default function Studio() {
     update(p => { const images = [...p.images], imageNames = [...p.imageNames]; while (images.length <= activeIndex) { images.push(images[0] || DEFAULT_PROJECT.images[0]); imageNames.push(imageNames[0] || "Illustration"); } images[activeIndex] = url; imageNames[activeIndex] = name; return { ...p, images, imageNames }; });
     setModal(null); notify(`Illustration added to page ${activeIndex + 1}.`);
   };
+  const chooseImages = (items: { url: string; name: string }[], start: number) => {
+    update(p => {
+      const images = [...p.images], imageNames = [...p.imageNames];
+      items.forEach((item, i) => {
+        const idx = start + i;
+        while (images.length <= idx) { images.push(images[0] || DEFAULT_PROJECT.images[0]); imageNames.push(imageNames[0] || "Illustration"); }
+        images[idx] = item.url; imageNames[idx] = item.name;
+      });
+      return { ...p, images, imageNames };
+    });
+    setModal(null);
+  };
   const chooseAudio = (url: string, name: string) => { setPlaying(false); setTime(0); update({ audioUrl: url, audioName: name, words: [], timingSource: "estimated" }); setModal(null); notify("Narration added. Import word timestamps for precise synchronization."); };
+  const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
+  const checkImageFile = async (file: File) => {
+    if (!IMAGE_TYPES.includes(file.type)) throw new Error(`"${file.name}": choose a JPG, PNG, or WebP illustration.`);
+    if (file.size > 10 * 1024 * 1024) throw new Error(`"${file.name}": choose a file smaller than 10 MB.`);
+    const bitmap = await createImageBitmap(file);
+    try { if (bitmap.width * bitmap.height > 30_000_000) throw new Error(`"${file.name}": resize your illustration to less than 30 megapixels.`); }
+    finally { bitmap.close(); }
+  };
+  const checkAudioFile = async (file: File) => {
+    if (!file.type.startsWith("audio/") && file.type !== "video/webm") throw new Error("Choose an audio file such as MP3 or WAV.");
+    if (file.size > 30 * 1024 * 1024) throw new Error("Choose a file smaller than 30 MB.");
+    const url = URL.createObjectURL(file);
+    try {
+      const probe = new Audio(url);
+      const duration = await new Promise<number>((resolve, reject) => { probe.onloadedmetadata = () => resolve(probe.duration); probe.onerror = () => reject(new Error("This audio file cannot be decoded.")); });
+      if (!Number.isFinite(duration) || duration < 1 || duration > 600) throw new Error("Use a narration between 1 second and 10 minutes.");
+    } finally { URL.revokeObjectURL(url); }
+  };
+  const postMedia = async (file: File) => {
+    const form = new FormData(); form.append("file", file);
+    const response = await fetch("/api/media", { method: "POST", body: form });
+    return parseApi(response);
+  };
+  const uploadImages = async (files: File[]) => {
+    if (uploading || !files.length) return;
+    const start = activeIndex;
+    setUploading("image"); setPlaying(false);
+    try {
+      const done: { url: string; name: string }[] = []; const failures: string[] = [];
+      for (const file of files.slice(0, 20)) {
+        try { await checkImageFile(file); const data = await postMedia(file); done.push({ url: data.url, name: file.name }); }
+        catch (error) { failures.push(error instanceof Error ? error.message : `"${file.name}": upload failed.`); }
+      }
+      if (done.length) { chooseImages(done, start); void loadMedia(); }
+      if (!done.length && failures.length) notify(failures[0], true);
+      else if (failures.length) notify(`${done.length} illustration${done.length === 1 ? "" : "s"} added, but ${failures.length} skipped: ${failures[0]}`, true);
+      else if (done.length === 1) notify(`Illustration added to page ${start + 1}.`);
+      else notify(`${done.length} illustrations added (pages ${start + 1}–${start + done.length}).`);
+    } finally { setUploading(null); if (imageInput.current) imageInput.current.value = ""; }
+  };
   const uploadFile = async (file: File, kind: "image" | "audio") => {
     if (uploading) return;
+    if (kind === "image") { void uploadImages([file]); return; }
     setUploading(kind); setPlaying(false);
     try {
-      if (kind === "image" && !["image/jpeg", "image/png", "image/webp"].includes(file.type)) throw new Error("Choose a JPG, PNG, or WebP illustration.");
-      if (kind === "audio" && !file.type.startsWith("audio/") && file.type !== "video/webm") throw new Error("Choose an audio file such as MP3 or WAV.");
-      if (file.size > (kind === "image" ? 10 : 30) * 1024 * 1024) throw new Error(`Choose a file smaller than ${kind === "image" ? 10 : 30} MB.`);
-      if (kind === "image") { const bitmap = await createImageBitmap(file); if (bitmap.width * bitmap.height > 30_000_000) { bitmap.close(); throw new Error("Resize your illustration to less than 30 megapixels."); } bitmap.close(); }
-      if (kind === "audio") { const url = URL.createObjectURL(file); try { const probe = new Audio(url); const duration = await new Promise<number>((resolve, reject) => { probe.onloadedmetadata = () => resolve(probe.duration); probe.onerror = () => reject(new Error("This audio file cannot be decoded.")); }); if (!Number.isFinite(duration) || duration < 1 || duration > 600) throw new Error("Use a narration between 1 second and 10 minutes."); } finally { URL.revokeObjectURL(url); } }
-      const form = new FormData(); form.append("file", file);
-      const response = await fetch("/api/media", { method: "POST", body: form }); const data = await response.json(); if (!response.ok) throw new Error(data.error);
-      if (kind === "image") chooseImage(data.url, file.name); else chooseAudio(data.url, file.name);
+      await checkAudioFile(file);
+      const data = await postMedia(file);
+      chooseAudio(data.url, file.name);
       void loadMedia();
     } catch (error) { notify(error instanceof Error ? error.message : "Upload failed. Please try again.", true); }
-    finally { setUploading(null); if (imageInput.current) imageInput.current.value = ""; if (audioInput.current) audioInput.current.value = ""; }
+    finally { setUploading(null); if (audioInput.current) audioInput.current.value = ""; }
   };
   const importText = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]; if (!file) return;
@@ -212,7 +272,7 @@ export default function Studio() {
   const loadProject = (saved: SavedProject) => { setProject({ ...saved.content, id: saved.id }); setSaveStatus("saved"); setTime(Math.min(14, saved.content.duration * .4)); setPlaying(false); setView("studio"); notify(`Opened “${saved.name}”.`); };
   const deleteProject = async () => {
     if (!deleteTarget) return;
-    try { const response = await fetch(`/api/projects/${deleteTarget.id}`, { method: "DELETE" }); if (!response.ok) { const data = await response.json(); throw new Error(data.error); } if (project.id === deleteTarget.id) { setProject(p => ({ ...p, id: undefined })); setSaveStatus("draft"); } setModal(null); setDeleteTarget(null); await loadProjects(); notify("Project deleted. Your uploaded media is still in the library."); } catch (error) { notify((error as Error).message, true); }
+    try { const response = await fetch(`/api/projects/${deleteTarget.id}`, { method: "DELETE" }); await parseApi(response); if (project.id === deleteTarget.id) { setProject(p => ({ ...p, id: undefined })); setSaveStatus("draft"); } setModal(null); setDeleteTarget(null); await loadProjects(); notify("Project deleted. Your uploaded media is still in the library."); } catch (error) { notify((error as Error).message, true); }
   };
 
   return <div className="app-shell">
@@ -247,7 +307,7 @@ export default function Studio() {
           <div className="editor-body">
             <div className="settings-pane"><div className="settings-tabs" role="tablist" aria-label="Editor settings"><button role="tab" aria-selected={tab === "content"} className={tab === "content" ? "active" : ""} onClick={() => setTab("content")}><FileText size={14} /> Your content</button><button role="tab" aria-selected={tab === "appearance"} className={tab === "appearance" ? "active" : ""} onClick={() => setTab("appearance")}><SlidersHorizontal size={14} /> Appearance</button></div>
               {tab === "content" ? <div className="settings-content">
-                <section className="form-section illustration-section"><div className="field-heading"><label>Your illustration</label><span className="field-counter">Page {activeIndex + 1}</span></div><div className={`illustration-upload ${dragging ? "dragging" : ""}`} onDragOver={e => { e.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={e => { e.preventDefault(); setDragging(false); const file = e.dataTransfer.files[0]; if (file) void uploadFile(file, "image"); }}><img src={currentImage} alt={`Illustration for page ${activeIndex + 1}`} /><div className="illustration-file"><span className="file-type-label"><CheckCircle2 size={11} /> READY TO DRAW</span><strong title={currentImageName}>{currentImageName}</strong><button className="text-button" onClick={() => imageInput.current?.click()} disabled={!!uploading}>{uploading === "image" ? <Loader2 size={12} className="spin" /> : <RotateCcw size={12} />}{uploading === "image" ? "Uploading…" : "Replace image"}</button></div><button className="image-library-button" title="Choose from media library" aria-label="Choose from media library" onClick={() => openModal("media")}><Images size={13} /></button></div><span className="field-hint">JPG, PNG or WebP <span>·</span> up to 10 MB</span></section>
+                <section className="form-section illustration-section"><div className="field-heading"><label>Your illustration</label><span className="field-counter">Page {activeIndex + 1}</span></div><div className={`illustration-upload ${dragging ? "dragging" : ""}`} onDragOver={e => { e.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={e => { e.preventDefault(); setDragging(false); const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith("image/")); if (files.length) void uploadImages(files); else if (e.dataTransfer.files.length) notify("Drop JPG, PNG, or WebP illustrations.", true); }}><img src={currentImage} alt={`Illustration for page ${activeIndex + 1}`} /><div className="illustration-file"><span className="file-type-label"><CheckCircle2 size={11} /> READY TO DRAW</span><strong title={currentImageName}>{currentImageName}</strong><button className="text-button" onClick={() => imageInput.current?.click()} disabled={!!uploading}>{uploading === "image" ? <Loader2 size={12} className="spin" /> : <RotateCcw size={12} />}{uploading === "image" ? "Uploading…" : "Replace image"}</button></div><button className="image-library-button" title="Choose from media library" aria-label="Choose from media library" onClick={() => openModal("media")}><Images size={13} /></button></div>    <span className="field-hint">JPG, PNG or WebP <span>·</span> up to 10 MB <span>·</span> select several to fill pages in order</span></section>
                 <section className="form-section story-section"><div className="field-heading"><label htmlFor="story-script">Your story</label><span className="field-counter">{scenes.length} paragraphs</span></div><div className="story-textarea-wrap"><textarea id="story-script" value={project.script} onChange={e => changeScript(e.target.value)} maxLength={20000} spellCheck={false} placeholder="Once upon a time… Separate paragraphs with a blank line to create new pages." /><span className="textarea-corner" /></div><div className="textarea-footer"><span>{wordCount} words</span><button className="text-button" onClick={() => textInput.current?.click()}><FileUp size={12} /> Import .txt</button></div></section>
                 <section className="form-section audio-section"><div className="field-heading"><label>Your narration</label><span className="optional-tag">MAKE IT YOURS</span></div>{project.audioUrl ? <div className="audio-file"><div className="audio-art"><AudioLines size={23} strokeWidth={1.5} /></div><div className="audio-file-copy"><strong title={project.audioName}>{project.audioName}</strong><span>{formatTime(project.duration)} <i /> Audio track</span></div><button className="icon-button" aria-label="Remove narration" onClick={() => { setPlaying(false); update({ audioUrl: "", audioName: "", words: [], timingSource: "estimated" }); }}><X size={14} /></button></div> : <button className="audio-empty" onClick={() => audioInput.current?.click()}><Upload size={18} /><span>Add your narration<small>MP3, WAV, M4A · up to 30 MB</small></span></button>}<div className="audio-links"><button className="text-button" disabled={!!uploading} onClick={() => audioInput.current?.click()}>{uploading === "audio" ? <Loader2 size={12} className="spin" /> : <Upload size={12} />}{uploading === "audio" ? "Uploading…" : "Upload audio"}</button><button className="text-button muted-text" onClick={() => timingInput.current?.click()}><Clock3 size={12} /> Add timestamps</button><button className="text-button" onClick={() => openModal("voice")}><Mic2 size={12} /> Generate voice</button></div></section>
                 <div className="settings-divider" /><div className="magic-label"><Sparkles size={13} /> THE LITTLE DETAILS</div><div className="content-toggles"><Toggle checked={project.settings.highlight} onChange={() => setting("highlight", !project.settings.highlight)} label="Word-by-word highlight" /><Toggle checked={project.settings.hand} onChange={() => setting("hand", !project.settings.hand)} label="Show drawing hand" /></div><div className="page-turn-setting"><label htmlFor="page-turn"><BookOpen size={14} /> Page transition</label><div><select id="page-turn" value={project.settings.transition} onChange={e => setting("transition", e.target.value as StorySettings["transition"])}><option value="curl">Soft page curl</option><option value="fade">Gentle fade</option><option value="none">Instant turn</option></select><ChevronDown size={12} /></div></div><div className="sync-note"><span className="sync-note-icon"><AudioLines size={15} /></span><p>Your voice sets the pace.<br /><strong>We’ll take care of the magic.</strong></p></div>
@@ -261,7 +321,7 @@ export default function Studio() {
     </div>
 
     <audio ref={audio} src={project.audioUrl || undefined} preload="metadata" onTimeUpdate={() => { if (playing && audio.current) setTime(audio.current.currentTime); }} onEnded={() => { setPlaying(false); setTime(project.duration); }} onLoadedMetadata={() => { const duration = audio.current?.duration; if (duration && Number.isFinite(duration) && Math.abs(duration - projectRef.current.duration) > .15) setProject(p => ({ ...p, duration })); }} />
-    <input hidden ref={imageInput} type="file" accept="image/png,image/jpeg,image/webp" onChange={e => { const file = e.target.files?.[0]; if (file) void uploadFile(file, "image"); }} />
+    <input hidden ref={imageInput} type="file" accept="image/png,image/jpeg,image/webp" multiple onChange={e => { const files = Array.from(e.target.files || []); if (files.length) void uploadImages(files); }} />
     <input hidden ref={audioInput} type="file" accept="audio/*" onChange={e => { const file = e.target.files?.[0]; if (file) void uploadFile(file, "audio"); }} />
     <input hidden ref={textInput} type="file" accept=".txt,text/plain" onChange={importText} />
     <input hidden ref={timingInput} type="file" accept=".json,.srt" onChange={importTimings} />
@@ -271,7 +331,7 @@ export default function Studio() {
     {modal === "voice" && <Modal title="Give your story a voice." subtitle="Choose a neural voice and generate narration with exact word-level timing." onClose={closeModal}><div className="modal-body"><p className="voice-intro">Select a voice below, then generate. Word timestamps are captured directly from the voice engine, so every word stays perfectly synchronized.</p><div className="voice-options">{(["neerja", "brian"] as const).map(key => <button key={key} className={`voice-option ${ttsVoice === key ? "selected" : ""}`} onClick={() => setTtsVoice(key)}><div className="voice-card-header"><span className={`voice-avatar ${key}`}>{key === "neerja" ? "N" : "B"}</span><div><strong>{key === "neerja" ? "Neerja" : "Brian"} <small>{key === "neerja" ? "English Female, Indian" : "English Male, American"}</small></strong><span>{key === "neerja" ? "Warm, expressive · deep storytelling" : "Clear, deliberate · impactful narration"}</span></div>{ttsVoice === key && <CheckCircle2 size={18} />}</div><div className="voice-settings-preview"><span>Rate: {key === "neerja" ? "−8%" : "−12%"}</span><span>Pitch: −3Hz</span><span>Volume: +5%</span></div></button>)}</div><p className="voice-note">Voice generation uses Microsoft Edge TTS. Requires network. Your uploaded audio is never replaced unless you choose it.</p><div className="modal-actions"><button className="button secondary" onClick={closeModal}>Not now</button><button className="button primary" disabled={ttsBusy || !project.script.trim()} onClick={() => { void generateTTS(); }}>{ttsBusy ? <><Loader2 size={15} className="spin" /> Generating…</> : <><Mic2 size={15} /> Generate voice</>}</button></div></div></Modal>}
 {modal === "diagnostics" && <Modal title="App health check." subtitle="Every subsystem, verified." onClose={closeModal}><div className="modal-body"><div className="diag-grid">{diagResults ? Object.entries(diagResults).map(([key, val]) => <div key={key} className={`diag-item ${val.ok ? "ok" : "fail"}`}><div className="diag-icon">{val.ok ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}</div><div><strong>{key.replace(/([A-Z])/g, " $1").replace(/^./, s => s.toUpperCase())}</strong><span>{val.ok ? "Healthy" : val.detail || "Needs attention"}</span></div></div>) : <div className="diag-loading"><Loader2 size={24} className="spin" /><span>Running diagnostics…</span></div>}</div><div className="modal-actions"><button className="button secondary" onClick={closeModal}>Close</button><button className="button primary" onClick={() => void runDiagnostics()}><Settings2 size={15} /> Re-check</button></div></div></Modal>}
 {modal === "help" && <Modal title="A little story. A little magic." subtitle="From an idea to a living storybook, in three simple steps." onClose={closeModal} wide><div className="modal-body help-modal-body"><div className="help-hero"><div className="help-book"><img src="/images/village-story.jpg" alt="A vintage illustration of Kael and Elara" /><div><span>Once upon<br />a little<br /><em>moment…</em></span><Leaf size={22} /></div></div><span className="help-sparkle one">✧</span><span className="help-sparkle two">✧</span></div><div className="help-steps"><article><span>01</span><div><h3>Set the scene</h3><p>Upload an illustration and write your story. A blank line between paragraphs begins a new page.</p></div></article><article><span>02</span><div><h3>Make it sound like you</h3><p>Add your narration. Import matching Whisper word-level JSON for precise timing, or an SRT file for estimated word timing.</p></div></article><article><span>03</span><div><h3>Let the pages come alive</h3><p>Play, adjust, and export a Full HD MP4. Or download a browser video or complete offline Python render kit.</p></div></article></div><div className="help-tip"><Sparkles size={16} /><p><strong>A small studio secret:</strong> use <kbd>space</kbd> to play or pause, and <kbd>⌘ / Ctrl + S</kbd> to save.</p></div><div className="modal-actions"><a href="https://github.com/itz-learningtime-oss/MY_VOICE_MY_story" target="_blank" rel="noreferrer" className="text-button">Built on the original project <ArrowUpRight size={13} /></a><button className="button primary" onClick={closeModal}>Let’s make something lovely <ArrowRight size={15} /></button></div></div></Modal>}
-    {(modal === "media" || modal === "audio") && <Modal title={modal === "media" ? "A world of little possibilities." : "Your voice brings it to life."} subtitle={modal === "media" ? `Choose an illustration for page ${activeIndex + 1}, or bring something of your own.` : "Choose a narration track from your workspace."} onClose={closeModal} wide><div className="modal-body library-modal"><div className="library-toolbar"><span>{modal === "media" ? "YOUR ILLUSTRATION LIBRARY" : "YOUR AUDIO LIBRARY"}</span><button className="button secondary" disabled={!!uploading} onClick={() => modal === "media" ? imageInput.current?.click() : audioInput.current?.click()}>{uploading ? <Loader2 size={15} className="spin" /> : <Upload size={15} />} Upload {modal === "media" ? "image" : "audio"}</button></div>{mediaError && <div className="inline-error"><AlertCircle size={15} />{mediaError}<button onClick={() => void loadMedia()}>Retry</button></div>}{modal === "media" ? <div className="media-grid">{DEFAULT_PROJECT.images.map((url, i) => <button key={url} onClick={() => chooseImage(url, DEFAULT_PROJECT.imageNames[i])}><img src={url} alt={["Kael and Elara in the village", "A moment in the cottage garden", "Elara on her way home"][i]} /><span>{["A chance encounter", "A little perspective", "The way home"][i]}<small>STUDIO ILLUSTRATION</small></span>{currentImage === url && <b><Check size={14} /></b>}</button>)}{mediaFiles.filter(f => f.mimeType.startsWith("image/")).map(file => <button key={file.id} onClick={() => chooseImage(file.url, file.originalName)}><img src={file.url} alt={file.originalName} /><span>{file.originalName}<small>YOUR UPLOAD</small></span>{currentImage === file.url && <b><Check size={14} /></b>}</button>)}</div> : <div className="audio-library"><div className="audio-library-item"><span className="audio-art"><AudioLines size={24} /></span><div><strong>The little things</strong><span>Synthetic demo narration · English</span><audio controls src="/audio/the-little-things.mp3" preload="metadata" /></div><button className="button secondary" onClick={() => { chooseAudio(DEFAULT_PROJECT.audioUrl, DEFAULT_PROJECT.audioName); if (project.script === DEMO_SCRIPT) fetch("/audio/demo-timestamps.json").then(r => r.json()).then(data => update({ words: data.words, duration: data.duration, timingSource: "word-level" })).catch(() => {}); }}>Use track</button></div>{mediaFiles.filter(f => f.mimeType.startsWith("audio/") || f.mimeType === "video/webm").map(file => <div key={file.id} className="audio-library-item"><span className="audio-art"><Mic2 size={22} /></span><div><strong>{file.originalName}</strong><span>Your recording · {(file.size / 1024 / 1024).toFixed(1)} MB</span><audio controls src={file.url} preload="metadata" /></div><button className="button secondary" onClick={() => chooseAudio(file.url, file.originalName)}>Use track</button></div>)}</div>}{mediaLoading && <div className="library-loading"><Loader2 size={17} className="spin" /> Loading your uploads…</div>}<p className="library-note"><ShieldCheck size={14} /> Your uploaded files are kept in this workspace. No external AI service is required.</p></div></Modal>}
+    {(modal === "media" || modal === "audio") && <Modal title={modal === "media" ? "A world of little possibilities." : "Your voice brings it to life."} subtitle={modal === "media" ? `Choose an illustration for page ${activeIndex + 1}, or bring something of your own.` : "Choose a narration track from your workspace."} onClose={closeModal} wide><div className="modal-body library-modal"><div className="library-toolbar"><span>{modal === "media" ? "YOUR ILLUSTRATION LIBRARY" : "YOUR AUDIO LIBRARY"}</span><button className="button secondary" disabled={!!uploading} onClick={() => modal === "media" ? imageInput.current?.click() : audioInput.current?.click()}>{uploading ? <Loader2 size={15} className="spin" /> : <Upload size={15} />} Upload {modal === "media" ? "image(s)" : "audio"}</button></div>{mediaError && <div className="inline-error"><AlertCircle size={15} />{mediaError}<button onClick={() => void loadMedia()}>Retry</button></div>}{modal === "media" ? <div className="media-grid">{DEFAULT_PROJECT.images.map((url, i) => <button key={url} onClick={() => chooseImage(url, DEFAULT_PROJECT.imageNames[i])}><img src={url} alt={["Kael and Elara in the village", "A moment in the cottage garden", "Elara on her way home"][i]} /><span>{["A chance encounter", "A little perspective", "The way home"][i]}<small>STUDIO ILLUSTRATION</small></span>{currentImage === url && <b><Check size={14} /></b>}</button>)}{mediaFiles.filter(f => f.mimeType.startsWith("image/")).map(file => <button key={file.id} onClick={() => chooseImage(file.url, file.originalName)}><img src={file.url} alt={file.originalName} /><span>{file.originalName}<small>YOUR UPLOAD</small></span>{currentImage === file.url && <b><Check size={14} /></b>}</button>)}</div> : <div className="audio-library"><div className="audio-library-item"><span className="audio-art"><AudioLines size={24} /></span><div><strong>The little things</strong><span>Synthetic demo narration · English</span><audio controls src="/audio/the-little-things.mp3" preload="metadata" /></div><button className="button secondary" onClick={() => { chooseAudio(DEFAULT_PROJECT.audioUrl, DEFAULT_PROJECT.audioName); if (project.script === DEMO_SCRIPT) fetch("/audio/demo-timestamps.json").then(r => r.json()).then(data => update({ words: data.words, duration: data.duration, timingSource: "word-level" })).catch(() => {}); }}>Use track</button></div>{mediaFiles.filter(f => f.mimeType.startsWith("audio/") || f.mimeType === "video/webm").map(file => <div key={file.id} className="audio-library-item"><span className="audio-art"><Mic2 size={22} /></span><div><strong>{file.originalName}</strong><span>Your recording · {(file.size / 1024 / 1024).toFixed(1)} MB</span><audio controls src={file.url} preload="metadata" /></div><button className="button secondary" onClick={() => chooseAudio(file.url, file.originalName)}>Use track</button></div>)}</div>}{mediaLoading && <div className="library-loading"><Loader2 size={17} className="spin" /> Loading your uploads…</div>}<p className="library-note"><ShieldCheck size={14} /> Your uploaded files are kept in this workspace. No external AI service is required.</p></div></Modal>}
     {modal === "delete" && deleteTarget && <Modal title="Close this chapter?" subtitle={`“${deleteTarget.name}” will be permanently removed from your story shelf.`} onClose={closeModal}><div className="modal-body"><p className="delete-note">Your uploaded illustrations and audio will stay in your media library. This action cannot be undone.</p><div className="modal-actions"><button className="button secondary" onClick={closeModal}>Keep my story</button><button className="button danger" onClick={() => void deleteProject()}><Trash2 size={15} /> Delete project</button></div></div></Modal>}
     {toast && <div className={`toast ${toast.error ? "error" : ""}`} role={toast.error ? "alert" : "status"}>{toast.error ? <AlertCircle size={19} /> : <CheckCircle2 size={19} />}<span>{toast.message}</span><button className="icon-button" aria-label="Dismiss notification" onClick={() => setToast(null)}><X size={15} /></button></div>}
   </div>;

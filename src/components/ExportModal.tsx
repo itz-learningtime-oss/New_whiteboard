@@ -13,6 +13,13 @@ export default function ExportModal({ project, onClose }: { project: StoryProjec
   const cancel = useCallback(async () => { controller.current?.abort(); if (job.current) { await fetch(`/api/render/${job.current}`, { method: "DELETE" }).catch(() => {}); job.current = null; } setBusy(false); }, []);
   useEffect(() => () => { controller.current?.abort(); if (resultUrl.current?.startsWith("blob:")) URL.revokeObjectURL(resultUrl.current); if (job.current) void fetch(`/api/render/${job.current}`, { method: "DELETE" }); }, []);
   const download = (url: string, name: string) => { const anchor = document.createElement("a"); anchor.href = url; anchor.download = name; document.body.appendChild(anchor); anchor.click(); anchor.remove(); };
+  const readApi = async (response: Response) => {
+    const contentType = response.headers.get("content-type") || "";
+    if (!contentType.includes("application/json")) throw new Error(`Server error (HTTP ${response.status}). The app server may need a restart.`);
+    const data = await response.json().catch(() => null);
+    if (!response.ok || !data) throw new Error(data?.error && typeof data.error === "string" ? data.error : `Request failed (HTTP ${response.status}).`);
+    return data;
+  };
   const startExport = async () => {
     setError(""); setResult(null); setProgress(0); const abort = new AbortController(); controller.current = abort;
     try {
@@ -24,16 +31,15 @@ export default function ExportModal({ project, onClose }: { project: StoryProjec
         const blob = await recordStorybook(project, setProgress, abort.signal); url = URL.createObjectURL(blob); name = `${filename}.webm`;
       } else if (format === "kit") {
         const response = await fetch("/api/export", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(project), signal: abort.signal });
-        if (!response.ok) { const data = await response.json(); throw new Error(data.error); }
+        if (!response.ok) { await readApi(response); throw new Error("Export failed."); }
         const blob = await response.blob(); url = URL.createObjectURL(blob); name = `${filename}-render-kit.zip`;
       } else {
         const response = await fetch("/api/render", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(project), signal: abort.signal });
-        const data = await response.json(); if (!response.ok) throw new Error(data.error); job.current = data.id;
+        const data = await readApi(response); job.current = data.id;
         const started = Date.now(); let output: string | undefined;
         while (!abort.signal.aborted && Date.now() - started < 16 * 60 * 1000) {
           await new Promise<void>((resolve, reject) => { const onAbort = () => { clearTimeout(timer); reject(new DOMException("Export cancelled", "AbortError")); }; const timer = setTimeout(() => { abort.signal.removeEventListener("abort", onAbort); resolve(); }, 1200); abort.signal.addEventListener("abort", onAbort, { once: true }); });
-          const statusResponse = await fetch(`/api/render/${data.id}`, { signal: abort.signal }); const status = await statusResponse.json();
-          if (!statusResponse.ok) throw new Error(status.error || "Unable to check render progress.");
+          const statusResponse = await fetch(`/api/render/${data.id}`, { signal: abort.signal }); const status = await readApi(statusResponse);
           setProgress(status.progress / 100);
           if (status.status === "complete") { output = status.url; job.current = null; break; }
           if (["failed", "cancelled"].includes(status.status)) { job.current = null; throw new Error(status.error || "The render did not complete."); }
@@ -46,7 +52,7 @@ export default function ExportModal({ project, onClose }: { project: StoryProjec
     } catch (err) { setBusy(false); if (!abort.signal.aborted) setError(err instanceof Error ? err.message : "Something went wrong. Please try again."); }
   };
   const formats = [
-    { id: "mp4" as const, icon: Film, title: "Full HD video", extension: "MP4", description: "Beautiful, share-ready H.264 video with your narration.", detail: "1920 × 1080 · 30 FPS", disabled: project.mode !== "storybook" },
+    { id: "mp4" as const, icon: Film, title: "Full HD video", extension: "MP4", description: "Beautiful, share-ready H.264 video with your narration.", detail: project.mode === "classic" ? "Classic uses browser export" : "Up to 14 min · 100 pages · 1920 × 1080 · 30 FPS", disabled: project.mode === "classic" },
     { id: "webm" as const, icon: MonitorPlay, title: "Browser video", extension: "WEBM", description: "Record your story right here. Keep this tab open.", detail: `Real-time export · about ${formatTime(project.duration)}`, disabled: false },
     { id: "kit" as const, icon: Package, title: "The complete render kit", extension: "ZIP", description: "Your media, timestamps, and Python engine. Ready to render offline.", detail: project.mode === "classic" ? "For storybook and whiteboard modes · use browser export for classic" : "Python + FFmpeg · all source included", disabled: project.mode === "classic" },
   ];

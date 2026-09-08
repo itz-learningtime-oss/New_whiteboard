@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server";
 import { spawn } from "node:child_process";
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { readFile, writeFile, mkdir, stat } from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { MEDIA_DIR, prepareStorage } from "@/lib/storage";
+import { db, isDbConfigured } from "@/db";
+import { media } from "@/db/schema";
+import { pythonBinary } from "@/lib/api";
 
 export const runtime = "nodejs";
 
@@ -27,22 +30,55 @@ export async function POST(request: Request) {
     }
     await prepareStorage();
 
-    const python = process.env.PYTHON_BINARY || "python3";
+    const python = pythonBinary();
     const script = `
-import asyncio, json, edge_tts, tempfile, subprocess, wave
+import asyncio, json, edge_tts, tempfile, subprocess, wave, re
 voice_cfg = ${JSON.stringify(VOICES[voice])}
 text = ${JSON.stringify(text.trim())}
 output = "${MEDIA_DIR}/" + "${randomUUID()}" + ".mp3"
+def normal(s): return re.sub(r"[^\\w]", "", s.lower(), flags=re.UNICODE)
+def distribute(bounds, tokens):
+    words = []
+    for kind, btext, start, end in bounds:
+        if end <= start: continue
+        if kind == "WordBoundary":
+            words.append({"word": btext, "start": round(start,3), "end": round(end,3)})
+            continue
+        parts = btext.split()
+        if not parts: continue
+        weights = [max(2, len(normal(p))) + (3 if re.search(r"[.!?\\u201d]$", p) else 0) for p in parts]
+        total = sum(weights) or 1
+        cursor = start
+        for part, weight in zip(parts, weights):
+            nxt = cursor + weight / total * (end - start)
+            words.append({"word": part, "start": round(cursor,3), "end": round(nxt,3)})
+            cursor = nxt
+    if [normal(w["word"]) for w in words] != [normal(t) for t in tokens]:
+        span = (bounds[0][2], bounds[-1][3])
+        weights = [max(2, len(normal(t))) + (3 if re.search(r"[.!?\\u201d]$", t) else 0) for t in tokens]
+        total = sum(weights) or 1
+        cursor = span[0]; words = []
+        for token, weight in zip(tokens, weights):
+            nxt = cursor + weight / total * (span[1] - span[0])
+            words.append({"word": token, "start": round(cursor,3), "end": round(nxt,3)})
+            cursor = nxt
+    return words
 communicate = edge_tts.Communicate(text, voice_cfg["id"], rate=voice_cfg["rate"], pitch=voice_cfg["pitch"], volume=voice_cfg["volume"])
-words = []
+bounds = []
 with open(output, "wb") as f:
     async for chunk in communicate.stream():
         if chunk["type"] == "audio":
             f.write(chunk["data"])
-        elif chunk["type"] == "WordBoundary":
-            words.append({"word": chunk["text"], "start": round(chunk["offset"]/1e7,3), "end": round((chunk["offset"]+chunk["duration"])/1e7,3)})
-if not words:
-    raise RuntimeError("No word boundaries returned.")
+        elif chunk["type"] in ("WordBoundary", "SentenceBoundary"):
+            bounds.append((chunk["type"], chunk["text"], chunk["offset"]/1e7, (chunk["offset"]+chunk["duration"])/1e7))
+if not bounds:
+    raise RuntimeError("No timing data returned. Check your network and try again.")
+words = distribute(bounds, text.split())
+for i in range(1, len(words)):
+    if words[i]["start"] < words[i-1]["end"]:
+        words[i]["start"] = words[i-1]["end"]
+    if words[i]["end"] <= words[i]["start"]:
+        words[i]["end"] = round(words[i]["start"] + 0.05, 3)
 probe = subprocess.run(["ffprobe","-v","error","-show_entries","format=duration","-of","default=noprint_wrappers=1:nokey=1", output], capture_output=True, text=True, timeout=30)
 dur = float(probe.stdout.strip()) if probe.returncode==0 else words[-1]["end"]+0.1
 offset = words[0]["start"]
@@ -76,6 +112,18 @@ print(json.dumps({"audio":output,"timestamps":ts_path,"duration":dur,"words":len
     const tsName = audioName.replace(".mp3", ".json");
     const audioUrl = `/api/media/${audioName}`;
     const words = JSON.parse(await readFile(data.timestamps, "utf-8"));
+    // Register the narration in the media library so it survives restarts.
+    if (isDbConfigured()) {
+      try {
+        const info = await stat(data.audio);
+        await db.insert(media).values({
+          filename: audioName,
+          originalName: `tts-${voice}.mp3`,
+          mimeType: "audio/mpeg",
+          size: info.size,
+        });
+      } catch (error) { console.error("TTS media register:", error); }
+    }
 
     return NextResponse.json({
       audioUrl,

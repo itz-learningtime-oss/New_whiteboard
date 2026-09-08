@@ -1,4 +1,4 @@
-import { db } from "@/db";
+import { db, isDbConfigured } from "@/db";
 import { media } from "@/db/schema";
 import { desc } from "drizzle-orm";
 import { NextResponse } from "next/server";
@@ -6,13 +6,16 @@ import { randomUUID } from "node:crypto";
 import { writeFile, unlink } from "node:fs/promises";
 import path from "node:path";
 import { MEDIA_DIR, prepareStorage } from "@/lib/storage";
+import { dbRequired } from "@/lib/api";
 
 const types: Record<string, string> = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", "audio/mpeg": "mp3", "audio/mp3": "mp3", "audio/wav": "wav", "audio/x-wav": "wav", "audio/wave": "wav", "audio/ogg": "ogg", "audio/mp4": "m4a", "audio/x-m4a": "m4a", "audio/webm": "webm", "video/webm": "webm" };
 export async function GET() {
+  const missing = dbRequired(); if (missing) return missing;
   try { const files = await db.select().from(media).orderBy(desc(media.createdAt)).limit(100); return NextResponse.json(files.map(f => ({ ...f, url: `/api/media/${f.filename}` }))); }
   catch { return NextResponse.json({ error: "Unable to load your media." }, { status: 500 }); }
 }
 export async function POST(request: Request) {
+  const missing = dbRequired(); if (missing) return missing;
   let destination: string | undefined;
   try {
     if (Number(request.headers.get("content-length") || 0) > 32 * 1024 * 1024) return NextResponse.json({ error: "Choose a file smaller than 30 MB." }, { status: 413 });
