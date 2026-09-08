@@ -1,0 +1,881 @@
+{
+  "words": [
+    {
+      "word": "Kael",
+      "start": 0.0,
+      "end": 0.439
+    },
+    {
+      "word": "walked",
+      "start": 0.439,
+      "end": 0.909
+    },
+    {
+      "word": "by,",
+      "start": 0.909,
+      "end": 1.715
+    },
+    {
+      "word": "carrying",
+      "start": 1.731,
+      "end": 2.346
+    },
+    {
+      "word": "a",
+      "start": 2.346,
+      "end": 2.623
+    },
+    {
+      "word": "crate",
+      "start": 2.623,
+      "end": 3.092
+    },
+    {
+      "word": "of",
+      "start": 3.092,
+      "end": 3.374
+    },
+    {
+      "word": "supplies.",
+      "start": 3.374,
+      "end": 4.127
+    },
+    {
+      "word": "He",
+      "start": 4.127,
+      "end": 4.446
+    },
+    {
+      "word": "stopped",
+      "start": 4.446,
+      "end": 4.974
+    },
+    {
+      "word": "when",
+      "start": 4.974,
+      "end": 5.415
+    },
+    {
+      "word": "he",
+      "start": 5.415,
+      "end": 5.734
+    },
+    {
+      "word": "saw",
+      "start": 5.734,
+      "end": 6.194
+    },
+    {
+      "word": "Elara\u2019s",
+      "start": 6.194,
+      "end": 6.766
+    },
+    {
+      "word": "thoughtful",
+      "start": 6.766,
+      "end": 7.424
+    },
+    {
+      "word": "face.",
+      "start": 7.424,
+      "end": 7.874
+    },
+    {
+      "word": "\u201cYou",
+      "start": 7.874,
+      "end": 8.338
+    },
+    {
+      "word": "know,\u201d",
+      "start": 8.338,
+      "end": 8.698
+    },
+    {
+      "word": "he",
+      "start": 8.698,
+      "end": 8.968
+    },
+    {
+      "word": "said",
+      "start": 8.968,
+      "end": 9.333
+    },
+    {
+      "word": "with",
+      "start": 9.333,
+      "end": 9.642
+    },
+    {
+      "word": "a",
+      "start": 9.642,
+      "end": 9.919
+    },
+    {
+      "word": "gentle",
+      "start": 9.919,
+      "end": 10.392
+    },
+    {
+      "word": "smile,",
+      "start": 10.392,
+      "end": 11.243
+    },
+    {
+      "word": "\u201cthe",
+      "start": 11.258,
+      "end": 11.69
+    },
+    {
+      "word": "most",
+      "start": 11.69,
+      "end": 12.138
+    },
+    {
+      "word": "wonderful",
+      "start": 12.138,
+      "end": 12.813
+    },
+    {
+      "word": "things",
+      "start": 12.813,
+      "end": 13.338
+    },
+    {
+      "word": "don\u2019t",
+      "start": 13.338,
+      "end": 13.744
+    },
+    {
+      "word": "always",
+      "start": 13.744,
+      "end": 14.389
+    },
+    {
+      "word": "come",
+      "start": 14.389,
+      "end": 14.801
+    },
+    {
+      "word": "with",
+      "start": 14.801,
+      "end": 15.111
+    },
+    {
+      "word": "a",
+      "start": 15.111,
+      "end": 15.388
+    },
+    {
+      "word": "price.\u201d",
+      "start": 15.388,
+      "end": 16.144
+    },
+    {
+      "word": "Elara",
+      "start": 16.144,
+      "end": 16.658
+    },
+    {
+      "word": "looked",
+      "start": 16.658,
+      "end": 17.091
+    },
+    {
+      "word": "down",
+      "start": 17.091,
+      "end": 17.537
+    },
+    {
+      "word": "at",
+      "start": 17.537,
+      "end": 17.824
+    },
+    {
+      "word": "the",
+      "start": 17.824,
+      "end": 18.14
+    },
+    {
+      "word": "little",
+      "start": 18.14,
+      "end": 18.57
+    },
+    {
+      "word": "golden",
+      "start": 18.57,
+      "end": 19.203
+    },
+    {
+      "word": "coin",
+      "start": 19.203,
+      "end": 19.691
+    },
+    {
+      "word": "in",
+      "start": 19.691,
+      "end": 19.987
+    },
+    {
+      "word": "her",
+      "start": 19.987,
+      "end": 20.307
+    },
+    {
+      "word": "palm.",
+      "start": 20.307,
+      "end": 20.797
+    },
+    {
+      "word": "For",
+      "start": 20.797,
+      "end": 21.16
+    },
+    {
+      "word": "the",
+      "start": 21.16,
+      "end": 21.434
+    },
+    {
+      "word": "first",
+      "start": 21.434,
+      "end": 21.917
+    },
+    {
+      "word": "time,",
+      "start": 21.917,
+      "end": 22.743
+    },
+    {
+      "word": "she",
+      "start": 22.804,
+      "end": 23.148
+    },
+    {
+      "word": "wondered",
+      "start": 23.148,
+      "end": 23.73
+    },
+    {
+      "word": "what",
+      "start": 23.73,
+      "end": 24.055
+    },
+    {
+      "word": "it",
+      "start": 24.055,
+      "end": 24.33
+    },
+    {
+      "word": "was",
+      "start": 24.33,
+      "end": 24.673
+    },
+    {
+      "word": "she",
+      "start": 24.673,
+      "end": 25.005
+    },
+    {
+      "word": "was",
+      "start": 25.005,
+      "end": 25.348
+    },
+    {
+      "word": "really",
+      "start": 25.348,
+      "end": 25.791
+    },
+    {
+      "word": "looking",
+      "start": 25.791,
+      "end": 26.394
+    },
+    {
+      "word": "for.",
+      "start": 26.394,
+      "end": 26.785
+    },
+    {
+      "word": "They",
+      "start": 26.785,
+      "end": 27.144
+    },
+    {
+      "word": "wandered",
+      "start": 27.144,
+      "end": 27.725
+    },
+    {
+      "word": "into",
+      "start": 27.725,
+      "end": 28.145
+    },
+    {
+      "word": "the",
+      "start": 28.145,
+      "end": 28.448
+    },
+    {
+      "word": "garden",
+      "start": 28.448,
+      "end": 29.026
+    },
+    {
+      "word": "behind",
+      "start": 29.026,
+      "end": 29.68
+    },
+    {
+      "word": "the",
+      "start": 29.68,
+      "end": 29.934
+    },
+    {
+      "word": "old",
+      "start": 29.934,
+      "end": 30.334
+    },
+    {
+      "word": "shop.",
+      "start": 30.334,
+      "end": 30.755
+    },
+    {
+      "word": "Kael",
+      "start": 30.755,
+      "end": 31.195
+    },
+    {
+      "word": "picked",
+      "start": 31.195,
+      "end": 31.635
+    },
+    {
+      "word": "up",
+      "start": 31.635,
+      "end": 32.035
+    },
+    {
+      "word": "a",
+      "start": 32.035,
+      "end": 32.41
+    },
+    {
+      "word": "tiny",
+      "start": 32.41,
+      "end": 32.926
+    },
+    {
+      "word": "seedling,",
+      "start": 32.926,
+      "end": 33.888
+    },
+    {
+      "word": "its",
+      "start": 33.903,
+      "end": 34.235
+    },
+    {
+      "word": "leaves",
+      "start": 34.235,
+      "end": 34.716
+    },
+    {
+      "word": "reaching",
+      "start": 34.716,
+      "end": 35.334
+    },
+    {
+      "word": "toward",
+      "start": 35.334,
+      "end": 36.002
+    },
+    {
+      "word": "the",
+      "start": 36.002,
+      "end": 36.257
+    },
+    {
+      "word": "afternoon",
+      "start": 36.257,
+      "end": 37.044
+    },
+    {
+      "word": "sun.",
+      "start": 37.044,
+      "end": 37.436
+    },
+    {
+      "word": "\u201cThis",
+      "start": 37.436,
+      "end": 37.988
+    },
+    {
+      "word": "little",
+      "start": 37.988,
+      "end": 38.418
+    },
+    {
+      "word": "plant",
+      "start": 38.418,
+      "end": 38.934
+    },
+    {
+      "word": "needs",
+      "start": 38.934,
+      "end": 39.445
+    },
+    {
+      "word": "patience,",
+      "start": 39.445,
+      "end": 40.446
+    },
+    {
+      "word": "a",
+      "start": 40.507,
+      "end": 40.784
+    },
+    {
+      "word": "little",
+      "start": 40.784,
+      "end": 41.214
+    },
+    {
+      "word": "water,",
+      "start": 41.214,
+      "end": 42.027
+    },
+    {
+      "word": "and",
+      "start": 42.027,
+      "end": 42.304
+    },
+    {
+      "word": "someone",
+      "start": 42.304,
+      "end": 42.913
+    },
+    {
+      "word": "who",
+      "start": 42.913,
+      "end": 43.299
+    },
+    {
+      "word": "cares,\u201d",
+      "start": 43.299,
+      "end": 43.803
+    },
+    {
+      "word": "he",
+      "start": 43.803,
+      "end": 44.073
+    },
+    {
+      "word": "said.",
+      "start": 44.073,
+      "end": 44.437
+    },
+    {
+      "word": "\u201cYou",
+      "start": 44.437,
+      "end": 44.901
+    },
+    {
+      "word": "can\u2019t",
+      "start": 44.901,
+      "end": 45.389
+    },
+    {
+      "word": "hurry",
+      "start": 45.389,
+      "end": 45.766
+    },
+    {
+      "word": "the",
+      "start": 45.766,
+      "end": 46.02
+    },
+    {
+      "word": "things",
+      "start": 46.02,
+      "end": 46.545
+    },
+    {
+      "word": "that",
+      "start": 46.545,
+      "end": 46.939
+    },
+    {
+      "word": "matter.\u201d",
+      "start": 46.939,
+      "end": 47.663
+    },
+    {
+      "word": "Elara",
+      "start": 47.663,
+      "end": 48.178
+    },
+    {
+      "word": "carefully",
+      "start": 48.178,
+      "end": 48.924
+    },
+    {
+      "word": "cradled",
+      "start": 48.924,
+      "end": 49.621
+    },
+    {
+      "word": "the",
+      "start": 49.621,
+      "end": 49.875
+    },
+    {
+      "word": "pot",
+      "start": 49.875,
+      "end": 50.217
+    },
+    {
+      "word": "in",
+      "start": 50.217,
+      "end": 50.544
+    },
+    {
+      "word": "her",
+      "start": 50.544,
+      "end": 50.892
+    },
+    {
+      "word": "hands,",
+      "start": 50.892,
+      "end": 51.773
+    },
+    {
+      "word": "feeling",
+      "start": 51.787,
+      "end": 52.394
+    },
+    {
+      "word": "the",
+      "start": 52.394,
+      "end": 52.648
+    },
+    {
+      "word": "quiet",
+      "start": 52.648,
+      "end": 53.183
+    },
+    {
+      "word": "promise",
+      "start": 53.183,
+      "end": 53.765
+    },
+    {
+      "word": "of",
+      "start": 53.765,
+      "end": 53.998
+    },
+    {
+      "word": "something",
+      "start": 53.998,
+      "end": 54.721
+    },
+    {
+      "word": "yet",
+      "start": 54.721,
+      "end": 55.065
+    },
+    {
+      "word": "to",
+      "start": 55.065,
+      "end": 55.423
+    },
+    {
+      "word": "grow.",
+      "start": 55.423,
+      "end": 55.753
+    },
+    {
+      "word": "As",
+      "start": 55.753,
+      "end": 56.03
+    },
+    {
+      "word": "the",
+      "start": 56.03,
+      "end": 56.285
+    },
+    {
+      "word": "sun",
+      "start": 56.285,
+      "end": 56.677
+    },
+    {
+      "word": "painted",
+      "start": 56.677,
+      "end": 57.341
+    },
+    {
+      "word": "the",
+      "start": 57.341,
+      "end": 57.644
+    },
+    {
+      "word": "rooftops",
+      "start": 57.644,
+      "end": 58.412
+    },
+    {
+      "word": "gold,",
+      "start": 58.412,
+      "end": 59.23
+    },
+    {
+      "word": "Elara",
+      "start": 59.246,
+      "end": 59.76
+    },
+    {
+      "word": "walked",
+      "start": 59.76,
+      "end": 60.279
+    },
+    {
+      "word": "home",
+      "start": 60.279,
+      "end": 60.788
+    },
+    {
+      "word": "with",
+      "start": 60.788,
+      "end": 61.158
+    },
+    {
+      "word": "her",
+      "start": 61.158,
+      "end": 61.519
+    },
+    {
+      "word": "new",
+      "start": 61.519,
+      "end": 61.968
+    },
+    {
+      "word": "little",
+      "start": 61.968,
+      "end": 62.447
+    },
+    {
+      "word": "plant.",
+      "start": 62.447,
+      "end": 63.012
+    },
+    {
+      "word": "Her",
+      "start": 63.012,
+      "end": 63.312
+    },
+    {
+      "word": "coin",
+      "start": 63.312,
+      "end": 63.829
+    },
+    {
+      "word": "was",
+      "start": 63.829,
+      "end": 64.209
+    },
+    {
+      "word": "still",
+      "start": 64.209,
+      "end": 64.715
+    },
+    {
+      "word": "tucked",
+      "start": 64.715,
+      "end": 65.271
+    },
+    {
+      "word": "safely",
+      "start": 65.271,
+      "end": 65.909
+    },
+    {
+      "word": "in",
+      "start": 65.909,
+      "end": 66.186
+    },
+    {
+      "word": "her",
+      "start": 66.186,
+      "end": 66.486
+    },
+    {
+      "word": "pocket.",
+      "start": 66.486,
+      "end": 67.063
+    },
+    {
+      "word": "But",
+      "start": 67.063,
+      "end": 67.412
+    },
+    {
+      "word": "she",
+      "start": 67.412,
+      "end": 67.781
+    },
+    {
+      "word": "carried",
+      "start": 67.781,
+      "end": 68.318
+    },
+    {
+      "word": "something",
+      "start": 68.318,
+      "end": 68.993
+    },
+    {
+      "word": "more",
+      "start": 68.993,
+      "end": 69.4
+    },
+    {
+      "word": "valuable",
+      "start": 69.4,
+      "end": 70.194
+    },
+    {
+      "word": "now:",
+      "start": 70.194,
+      "end": 71.058
+    },
+    {
+      "word": "the",
+      "start": 71.058,
+      "end": 71.312
+    },
+    {
+      "word": "understanding",
+      "start": 71.312,
+      "end": 72.296
+    },
+    {
+      "word": "that",
+      "start": 72.296,
+      "end": 72.665
+    },
+    {
+      "word": "joy",
+      "start": 72.665,
+      "end": 73.063
+    },
+    {
+      "word": "could",
+      "start": 73.063,
+      "end": 73.447
+    },
+    {
+      "word": "be",
+      "start": 73.447,
+      "end": 73.768
+    },
+    {
+      "word": "found",
+      "start": 73.768,
+      "end": 74.272
+    },
+    {
+      "word": "in",
+      "start": 74.272,
+      "end": 74.549
+    },
+    {
+      "word": "the",
+      "start": 74.549,
+      "end": 74.802
+    },
+    {
+      "word": "simplest",
+      "start": 74.802,
+      "end": 75.57
+    },
+    {
+      "word": "things.",
+      "start": 75.57,
+      "end": 76.103
+    },
+    {
+      "word": "And",
+      "start": 76.103,
+      "end": 76.406
+    },
+    {
+      "word": "sometimes,",
+      "start": 76.406,
+      "end": 77.51
+    },
+    {
+      "word": "the",
+      "start": 77.525,
+      "end": 77.828
+    },
+    {
+      "word": "smallest",
+      "start": 77.828,
+      "end": 78.508
+    },
+    {
+      "word": "moment",
+      "start": 78.508,
+      "end": 79.135
+    },
+    {
+      "word": "could",
+      "start": 79.135,
+      "end": 79.51
+    },
+    {
+      "word": "become",
+      "start": 79.51,
+      "end": 80.125
+    },
+    {
+      "word": "the",
+      "start": 80.125,
+      "end": 80.427
+    },
+    {
+      "word": "beginning",
+      "start": 80.427,
+      "end": 81.08
+    },
+    {
+      "word": "of",
+      "start": 81.08,
+      "end": 81.314
+    },
+    {
+      "word": "a",
+      "start": 81.314,
+      "end": 81.59
+    },
+    {
+      "word": "very",
+      "start": 81.59,
+      "end": 81.974
+    },
+    {
+      "word": "beautiful",
+      "start": 81.974,
+      "end": 82.686
+    },
+    {
+      "word": "story.",
+      "start": 82.686,
+      "end": 83.203
+    }
+  ],
+  "duration": 83.77732426303855,
+  "source": "eSpeak audio-clock marks and word events; synthetic demo"
+}

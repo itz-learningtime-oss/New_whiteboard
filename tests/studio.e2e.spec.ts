@@ -1,0 +1,100 @@
+import { test, expect } from "@playwright/test";
+import { execFileSync } from "node:child_process";
+import { mkdirSync, writeFileSync } from "node:fs";
+import path from "node:path";
+import JSZip from "jszip";
+
+const base = process.env.PREVIEW_URL || "http://127.0.0.1:3000";
+const artifacts = path.join(process.cwd(), ".data", "browser-tests");
+test.setTimeout(150_000);
+
+test("studio preview, settings, projects, imports, and real video exports", async ({ page }) => {
+  mkdirSync(artifacts, { recursive: true });
+  const errors: string[] = [];
+  page.on("pageerror", error => errors.push(error.message));
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto(base);
+  await expect(page.getByRole("heading", { name: /Every story deserves/ })).toBeVisible();
+  await expect(page.locator(".preview-loading")).toHaveCount(0, { timeout: 30_000 });
+  await page.evaluate(() => document.fonts.ready);
+  await expect(page.locator(".preview-status")).toContainText("Word-level audio sync is ready", { timeout: 15_000 });
+  await page.screenshot({ path: path.join(artifacts, "studio-desktop.png"), fullPage: true });
+  await page.getByRole("button", { name: "Play story", exact: true }).click();
+  await page.waitForTimeout(1200);
+  expect(await page.locator("audio").first().evaluate(element => (element as HTMLAudioElement).currentTime)).toBeGreaterThan(14.3);
+  await page.getByRole("button", { name: "Pause story", exact: true }).click();
+  await page.getByRole("tab", { name: "Appearance" }).click();
+  await page.locator("#font-select").selectOption("handwritten");
+  await expect(page.locator(".font-preview")).toHaveClass(/handwritten/);
+  await page.getByRole("button", { name: "warm paper", exact: true }).click();
+  await expect(page.getByRole("button", { name: "warm paper", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await page.getByRole("button", { name: "Reset to the original style" }).click();
+  await page.getByRole("tab", { name: "Your content" }).click();
+  await page.getByRole("button", { name: "How it works" }).click();
+  await expect(page.getByRole("dialog")).toContainText("Set the scene");
+  await page.getByRole("button", { name: "Let’s make something lovely" }).click();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: path.join(artifacts, "studio-mobile.png"), fullPage: true });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+  await page.setViewportSize({ width: 1440, height: 1000 });
+
+  // Create a short, real project to exercise upload, timing, database persistence,
+  // and all three export pipelines without recording an entire demo narration.
+  await page.getByRole("button", { name: /New project/ }).first().click();
+  const title = `Browser verification ${Date.now()}`;
+  await page.locator("#project-title").fill(title);
+  await page.getByRole("button", { name: /A fresh page/ }).click();
+  await page.getByRole("button", { name: "Let’s begin" }).click();
+  const script = "A little story begins.\n\nAnd magic follows.";
+  await page.locator("#story-script").fill(script);
+  const wav = path.join(artifacts, "narration.wav");
+  execFileSync("ffmpeg", ["-v", "error", "-y", "-f", "lavfi", "-i", "sine=frequency=440:duration=3", "-c:a", "pcm_s16le", wav]);
+  await page.locator('input[accept="audio/*"]').setInputFiles(wav);
+  await expect(page.locator(".audio-file-copy strong")).toHaveText("narration.wav", { timeout: 15_000 });
+  await expect.poll(async () => page.locator("audio").first().evaluate(el => (el as HTMLAudioElement).duration)).toBeCloseTo(3, 1);
+  await page.locator('input[accept="image/png,image/jpeg,image/webp"]').setInputFiles("public/images/village-story.jpg");
+  await expect(page.locator(".illustration-file>strong")).toHaveText("village-story.jpg", { timeout: 15_000 });
+  const words = script.split(/\s+/).map((word, i) => ({ word, start: i < 4 ? i * .25 : 1.7 + (i - 4) * .35, end: i < 4 ? (i + 1) * .25 : 2.05 + (i - 4) * .35 }));
+  const timestamps = path.join(artifacts, "words.json"); writeFileSync(timestamps, JSON.stringify({ words }));
+  await page.locator('input[accept=".json,.srt"]').setInputFiles(timestamps);
+  await expect(page.locator(".preview-status")).toContainText("Word-level audio sync is ready");
+  await page.getByRole("button", { name: "Save project", exact: true }).click();
+  await expect(page.locator(".save-indicator")).toContainText("All changes saved", { timeout: 15_000 });
+  const draft = JSON.parse(await page.evaluate(() => localStorage.getItem("my-storybook-draft-v1") || "{}"));
+  expect(draft.id).toBeTruthy();
+  await page.getByRole("button", { name: /My projects/ }).first().click();
+  await expect(page.locator(".saved-project-info")).toContainText(title);
+  await page.getByRole("button", { name: title, exact: true }).click();
+  await expect(page.locator("#story-script")).toHaveValue(script);
+
+  await page.getByRole("button", { name: "Export video", exact: true }).click();
+  const mp4Download = page.waitForEvent("download", { timeout: 100_000 });
+  await page.getByRole("button", { name: "Create my video" }).click();
+  const mp4 = await mp4Download;
+  const mp4Path = path.join(artifacts, "storybook.mp4"); await mp4.saveAs(mp4Path);
+  const info = JSON.parse(execFileSync("ffprobe", ["-v", "error", "-show_streams", "-of", "json", mp4Path], { encoding: "utf8" }));
+  expect(info.streams.find((s: { codec_type: string }) => s.codec_type === "video").width).toBe(1920);
+  expect(info.streams.find((s: { codec_type: string }) => s.codec_type === "audio").codec_name).toBe("aac");
+  await page.screenshot({ path: path.join(artifacts, "export-complete.png"), fullPage: true });
+  await page.getByRole("button", { name: "Back to your story" }).click();
+
+  await page.getByRole("button", { name: "Export video", exact: true }).click();
+  await page.getByRole("button", { name: /The complete render kit/ }).click();
+  const kitDownload = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Download render kit" }).click();
+  const kit = await kitDownload; const kitPath = path.join(artifacts, "render-kit.zip"); await kit.saveAs(kitPath);
+  const fs = await import("node:fs/promises"); const zip = await JSZip.loadAsync(await fs.readFile(kitPath));
+  expect(zip.file("src/storybook_engine.py")).not.toBeNull(); expect(zip.file("assets/storybook_spread_bg.png")).not.toBeNull();
+  expect(await zip.file("inputs/story.txt")!.async("string")).toBe(script);
+  await page.getByRole("button", { name: "Back to your story" }).click();
+
+  await page.getByRole("button", { name: "Export video", exact: true }).click();
+  await page.getByRole("button", { name: /Browser video/ }).click();
+  const webmDownload = page.waitForEvent("download", { timeout: 30_000 });
+  await page.getByRole("button", { name: "Create my video" }).click();
+  const webm = await webmDownload; const webmPath = path.join(artifacts, "storybook.webm"); await webm.saveAs(webmPath);
+  const webmInfo = JSON.parse(execFileSync("ffprobe", ["-v", "error", "-show_streams", "-of", "json", webmPath], { encoding: "utf8" }));
+  expect(webmInfo.streams.some((s: { codec_type: string }) => s.codec_type === "audio")).toBeTruthy();
+  expect(errors).toEqual([]);
+  await page.request.delete(`${base}/api/projects/${draft.id}`);
+});

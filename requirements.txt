@@ -1,0 +1,6 @@
+Pillow>=10.0,<13
+numpy>=1.26,<3
+opencv-python-headless>=4.8,<6
+pydub>=0.25,<1
+
+# FFmpeg + FFprobe must also be installed on the host.
